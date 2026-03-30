@@ -3,20 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Deslizador Pro - Gemini</title>
+    <title>Puzle Deslizante Pro - Gemini</title>
     <style>
+        /* --- ESTILOS GENERALES (Reset & Base) --- */
         :root {
-            --bg-color: #111827;
-            --tile-bg: #1f293a;
-            --accent: #60a5fa;
-            --text: #f3f4f6;
-            --board-size: 360px; /* Tamaño base para escritorio, se ajusta en móvil */
+            /* Colores inspirados en iOS */
+            --bg-color: #F2F2F7;
+            --container-bg: #FFFFFF;
+            --accent-color: #007AFF; /* Azul iOS */
+            --text-main: #000000;
+            --text-secondary: #8E8E93;
+            --border-color: #D1D1D6;
+            
+            /* Configuraciones de tamaño (Grid 4x3) */
+            --grid-cols: 3;
+            --grid-rows: 4;
+            --base-unit: 85px; /* Tamaño base de la pieza */
+            --gap: 2px;
+            --board-width: calc((var(--base-unit) * var(--grid-cols)) + (var(--gap) * (var(--grid-cols) - 1)));
+            --board-height: calc((var(--base-unit) * var(--grid-rows)) + (var(--gap) * (var(--grid-rows) - 1)));
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--bg-color);
-            color: var(--text);
+            color: var(--text-main);
             margin: 0;
             display: flex;
             flex-direction: column;
@@ -24,212 +42,345 @@
             justify-content: center;
             height: 100vh;
             overflow: hidden;
-            touch-action: none; /* Crucial para el arrastre en móvil */
+            /* Soporte para 'safe areas' en iPhone */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
-        h1 { margin: 0 0 10px 0; font-size: 1.4rem; font-weight: 300; letter-spacing: 1px;}
-        span.highlight { color: var(--accent); font-weight: bold; }
+        /* --- INTERFAZ DE USUARIO --- */
+        header {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
 
-        #game-area {
+        h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* --- CONTENEDOR PRINCIPAL DEL JUEGO --- */
+        #game-container {
             position: relative;
-            width: var(--board-size);
-            height: var(--board-size);
-            background: #000;
-            border-radius: 12px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
-            overflow: hidden;
-            touch-action: none;
-            user-select: none;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+            justify-content: center;
         }
 
+        /* Zona de Placeholder inicial */
+        #photo-selector {
+            width: var(--board-width);
+            height: var(--board-height);
+            background-color: #E5E5EA;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            border: 2px dashed var(--border-color);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #photo-selector:hover {
+            background-color: #D1D1D6;
+        }
+
+        #photo-selector svg {
+            width: 50px;
+            height: 50px;
+            fill: var(--text-secondary);
+        }
+
+        #photo-selector p {
+            margin: 0;
+            color: var(--text-main);
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+
+        /* Input oculto para cargar archivo */
+        #file-input {
+            display: none;
+        }
+
+        /* El tablero de juego real */
+        #game-board {
+            position: relative;
+            width: var(--board-width);
+            height: var(--board-height);
+            background-color: var(--container-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            display: none; /* Oculto hasta que se cargue la foto */
+            touch-action: none; /* Crucial para evitar scroll al arrastrar */
+        }
+
+        /* --- ESTILOS DE LAS PIEZAS (TILE) --- */
         .tile {
             position: absolute;
-            background-image: url('https://images.unsplash.com/photo-1599672624237-944216b5f939?q=80&w=600&auto=format&fit=crop');
-            background-size: var(--board-size) var(--board-size);
+            width: var(--base-unit);
+            height: var(--base-unit);
+            background-size: var(--board-width) var(--board-height);
             border-radius: 6px;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
-            transition: box-shadow 0.2s;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
             cursor: grab;
-            /* La transición de transform se activa SOLO cuando no estamos arrastrando */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
         }
 
+        /* Efecto al arrastrar */
         .tile.dragging {
             cursor: grabbing;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             z-index: 10;
-            transition: none !important; /* Movimiento instantáneo al arrastrar */
+            opacity: 0.9;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+            transition: transform 0.05s linear !important; /* Movimiento instantáneo */
         }
 
+        /* Animación de ajuste al soltar */
         .tile.snap-back {
-            transition: transform 0.2s ease-out; /* Animación al soltar */
+            transition: transform 0.2s ease-out;
         }
 
+        /* Ocultar la pieza vacía */
         .tile.empty {
             visibility: hidden;
         }
 
-        #ui {
-            margin-top: 20px;
+        /* Pieza correcta al resolver */
+        .tile.solved {
+            box-shadow: inset 0 0 0 2px #4ADE80;
+        }
+
+        /* --- BOTONES Y CONTROLES --- */
+        #controls {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
         }
 
-        button {
-            padding: 10px 25px;
-            background: transparent;
-            border: 2px solid var(--accent);
-            color: var(--accent);
-            border-radius: 30px;
-            cursor: pointer;
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
             font-size: 1rem;
-            transition: all 0.2s;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.1s, transform 0.1s;
         }
 
-        button:hover {
-            background: var(--accent);
-            color: var(--bg-color);
+        .btn:active {
+            opacity: 0.8;
+            transform: scale(0.98);
         }
 
-        #status {
-            font-size: 1.1rem;
-            height: 1.2rem;
-            color: #4ade80;
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
         }
 
-        /* Ajustes para pantallas pequeñas (Móvil) */
-        @media (max-width: 400px) {
+        .btn-secondary {
+            background-color: #E5E5EA;
+            color: var(--text-main);
+            display: none; /* Oculto al inicio */
+        }
+
+        #status-message {
+            margin-top: 10px;
+            color: #4ADE80;
+            font-weight: 500;
+            height: 1rem;
+        }
+
+        /* Adaptación para pantallas muy pequeñas */
+        @media (max-width: 350px) {
             :root {
-                --board-size: 85vw; /* 85% del ancho de la ventana */
+                --base-unit: 70px;
             }
-            h1 { font-size: 1.2rem; }
         }
     </style>
 </head>
 <body>
 
-    <h1>Puzle <span class="highlight">Abstract Geometric</span></h1>
-    
-    <div id="game-area">
+    <header>
+        <h1>Puzle Pro</h1>
+        <div class="subtitle">Desliza para ordenar la imagen</div>
+    </header>
+
+    <div id="game-container">
+        <input type="file" id="file-input" accept="image/*">
+        
+        <div id="photo-selector">
+            <svg viewBox="0 0 24 24">
+                <path d="M5,3A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3H5M5,5H19V19H5V5M10.96,12.29L8.46,15.79L7.21,14.54L5.46,16.79H18.54L14.79,11.79L10.96,12.29Z" />
+            </svg>
+            <p>Seleccionar Foto</p>
         </div>
 
-    <div id="ui">
-        <div id="status"></div>
-        <button id="shuffle-btn">Mezclar y Jugar</button>
+        <div id="game-board"></div>
+        <div id="status-message"></div>
+    </div>
+
+    <div id="controls">
+        <button id="shuffle-btn" class="btn btn-secondary">Mezclar y Jugar</button>
     </div>
 
     <script>
-        const gridCount = 3; // 3x3
-        const gameArea = document.getElementById('game-area');
-        const statusDiv = document.getElementById('status');
+        /* --- CONFIGURACIÓN Y ESTADO --- */
+        const gridCols = 3;
+        const gridRows = 4;
+        const totalTiles = gridCols * gridRows;
+        
+        const photoSelector = document.getElementById('photo-selector');
+        const fileInput = document.getElementById('file-input');
+        const gameBoard = document.getElementById('game-board');
         const shuffleBtn = document.getElementById('shuffle-btn');
+        const statusMessage = document.getElementById('status-message');
 
-        let tileSize;
-        let tilesCount = gridCount * gridCount;
-        let gameState = []; // Guarda el índice de la pieza en cada posición [0,1,2...]
+        let tileSize; // Se calculará dinámicamente
+        let gapSize = 2; // Sincronizado con CSS --gap
+
+        let gameState = []; // Mapa de índices de piezas [0,1,2...]
+        let emptyIndex; // Índice de la celda vacía (0 a 11)
+        
+        // Estado del arrastre
         let isDragging = false;
         let currentTile = null;
         let dragStartX, dragStartY;
         let tileStartX, tileStartY;
-        let emptyPos; // {row, col}
-        let puzzleSolved = false;
+        let currentImageSrc = null;
 
-        // --- Inicialización ---
-        function initGame() {
-            calculateSizes();
-            createInitialState();
-            renderTiles();
-            shuffleBtn.addEventListener('click', shuffle);
-            window.addEventListener('resize', onResize);
+        /* --- INICIALIZACIÓN Y GESTIÓN DE FOTO --- */
+        
+        // 1. Clic en el placeholder abre el selector de archivos nativo
+        photoSelector.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 2. Manejar la foto seleccionada
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentImageSrc = event.target.result;
+                initGameBoard();
+            };
+            reader.readAsDataURL(file);
         }
 
-        function calculateSizes() {
-            const areaWidth = gameArea.clientWidth;
-            tileSize = areaWidth / gridCount;
-        }
+        // 3. Crear el tablero y las piezas
+        function initGameBoard() {
+            // Limpiar tablero previo si lo hubiera
+            gameBoard.innerHTML = '';
+            statusMessage.innerText = '';
+            
+            // Ocultar selector, mostrar tablero
+            photoSelector.style.display = 'none';
+            gameBoard.style.display = 'block';
+            shuffleBtn.style.display = 'inline-block';
 
-        function onResize() {
-            calculateSizes();
-            // Actualizar el tamaño de background y posición de todas las piezas existentes
-            const uiTiles = document.querySelectorAll('.tile');
-            uiTiles.forEach(uiTile => {
-                const id = parseInt(uiTile.dataset.id);
-                uiTile.style.width = `${tileSize}px`;
-                uiTile.style.height = `${tileSize}px`;
-                uiTile.style.backgroundSize = `${gameArea.clientWidth}px ${gameArea.clientWidth}px`;
-                if (!uiTile.classList.contains('dragging')) {
-                    const pos = gameState.indexOf(id);
-                    updateTilePositionDOM(uiTile, pos);
-                }
-            });
-        }
+            // Calcular tamaño real de la pieza basándonos en el contenedor CSS
+            const boardStyle = getComputedStyle(document.documentElement);
+            tileSize = parseInt(boardStyle.getPropertyValue('--base-unit'));
+            gapSize = parseInt(boardStyle.getPropertyValue('--gap'));
 
-        function createInitialState() {
-            gameState = Array.from({length: tilesCount}, (_, i) => i);
-            emptyPos = {row: gridCount - 1, col: gridCount - 1}; // Última celda vacía
-        }
+            // Crear el estado ordenado inicial
+            gameState = Array.from({length: totalTiles}, (_, i) => i);
+            emptyIndex = totalTiles - 1; // La última es la vacía
 
-        function renderTiles() {
-            gameArea.innerHTML = ''; // Limpiar
-            for (let i = 0; i < tilesCount; i++) {
+            // Renderizar las piezas
+            for (let i = 0; i < totalTiles; i++) {
                 const tileId = gameState[i];
                 const tile = document.createElement('div');
                 tile.classList.add('tile');
-                tile.dataset.id = tileId; // ID único de la pieza (0 a 8)
-                tile.style.width = `${tileSize}px`;
-                tile.style.height = `${tileSize}px`;
-
-                if (tileId === tilesCount - 1) {
-                    tile.classList.add('empty');
-                } else {
-                    // Calcular qué parte de la imagen va aquí
-                    const correctRow = Math.floor(tileId / gridCount);
-                    const correctCol = tileId % gridCount;
-                    const bgX = correctCol * tileSize;
-                    const bgY = correctRow * tileSize;
+                tile.dataset.id = tileId; // ID único de la pieza (0 a 11)
+                
+                // Si no es la pieza vacía, asignarle imagen y posición
+                if (tileId !== totalTiles - 1) {
+                    tile.style.backgroundImage = `url(${currentImageSrc})`;
+                    
+                    // Calcular qué fragmento de la foto va aquí
+                    const correctRow = Math.floor(tileId / gridCols);
+                    const correctCol = tileId % gridCols;
+                    const bgX = correctCol * (tileSize + gapSize);
+                    const bgY = correctRow * (tileSize + gapSize);
                     tile.style.backgroundPosition = `-${bgX}px -${bgY}px`;
                     
-                    // Asignar posición visual inicial
-                    updateTilePositionDOM(tile, i);
-
-                    // Eventos de arrastre (Pointer Events manejan ratón y toque)
+                    // Eventos de puntero para arrastrar (Touch & Mouse)
                     tile.addEventListener('pointerdown', onPointerDown);
+                } else {
+                    tile.classList.add('empty');
                 }
-                gameArea.appendChild(tile);
+                
+                // Posicionar visualmente en su celda inicial
+                updateTilePositionDOM(tile, i);
+                gameBoard.appendChild(tile);
             }
+
+            shuffleBtn.onclick = shuffle;
         }
 
-        // --- Lógica de Posicionamiento ---
-        function getGridPos(index) {
+        /* --- LÓGICA DE POSICIONAMIENTO (DOM) --- */
+        
+        function getGridCoords(index) {
             return {
-                row: Math.floor(index / gridCount),
-                col: index % gridCount
+                row: Math.floor(index / gridCols),
+                col: index % gridCols
             };
         }
 
         function updateTilePositionDOM(tileEl, index) {
-            const {row, col} = getGridPos(index);
-            const x = col * tileSize;
-            const y = row * tileSize;
+            const coords = getGridCoords(index);
+            // x, y incluyendo el gap
+            const x = coords.col * (tileSize + gapSize);
+            const y = coords.row * (tileSize + gapSize);
             tileEl.style.transform = `translate(${x}px, ${y}px)`;
         }
 
-        // --- Lógica del Arrastre (Drag & Drop) ---
+        /* --- MECÁNICA DE ARRASTRE Y ENCAJE (DRAG & DROP) --- */
+        
         function onPointerDown(e) {
-            if (puzzleSolved || isDragging) return;
+            if (isDragging || !shuffleBtn.classList.contains('active')) return;
 
             const tile = e.currentTarget;
             const tileId = parseInt(tile.dataset.id);
-            const currentPos = gameState.indexOf(tileId);
-            const gridPos = getGridPos(currentPos);
+            const currentIndex = gameState.indexOf(tileId);
+            const coords = getGridCoords(currentIndex);
+            const emptyCoords = getGridCoords(emptyIndex);
 
-            // Verificar si es adyacente al hueco
-            const isMovable = (Math.abs(gridPos.row - emptyPos.row) === 1 && gridPos.col === emptyPos.col) ||
-                              (Math.abs(gridPos.col - emptyPos.col) === 1 && gridPos.row === emptyPos.row);
+            // Verificar si es adyacente al hueco vacío (1x0 o 0x1)
+            const diffRow = Math.abs(coords.row - emptyCoords.row);
+            const diffCol = Math.abs(coords.col - emptyCoords.col);
+            const isMovable = (diffRow === 1 && diffCol === 0) || (diffRow === 0 && diffCol === 1);
 
             if (!isMovable) return;
 
+            // Iniciar arrastre
             isDragging = true;
             currentTile = tile;
             currentTile.classList.add('dragging');
@@ -238,12 +389,12 @@
             dragStartX = e.clientX;
             dragStartY = e.clientY;
 
-            // Obtener la posición 'translate' actual
-            const matrix = new DOMMatrix(window.getComputedStyle(currentTile).transform);
+            // Obtener el translate actual de la pieza
+            const matrix = new DOMMatrix(getComputedStyle(currentTile).transform);
             tileStartX = matrix.m41;
             tileStartY = matrix.m42;
 
-            // Capturar el puntero para que siga arrastrando aunque salga de la pieza
+            // Capturar puntero
             currentTile.setPointerCapture(e.pointerId);
             currentTile.addEventListener('pointermove', onPointerMove);
             currentTile.addEventListener('pointerup', onPointerUp);
@@ -257,22 +408,26 @@
             const dy = e.clientY - dragStartY;
 
             const tileId = parseInt(currentTile.dataset.id);
-            const currentPos = gameState.indexOf(tileId);
-            const gridPos = getGridPos(currentPos);
+            const currentIndex = gameState.indexOf(tileId);
+            const coords = getGridCoords(currentIndex);
+            const emptyCoords = getGridCoords(emptyIndex);
 
             let finalX = tileStartX;
             let finalY = tileStartY;
 
-            // Restringir el movimiento: solo hacia el hueco vacío
-            if (gridPos.row === emptyPos.row) {
+            // RESTRICCIÓN DE MOVIMIENTO: Solo hacia la celda vacía
+            
+            if (coords.row === emptyCoords.row) {
                 // Movimiento Horizontal
-                const minX = Math.min(gridPos.col, emptyPos.col) * tileSize;
-                const maxX = Math.max(gridPos.col, emptyPos.col) * tileSize;
+                const minX = Math.min(coords.col, emptyCoords.col) * (tileSize + gapSize);
+                const maxX = Math.max(coords.col, emptyCoords.col) * (tileSize + gapSize);
+                // Ajustar entre origen y destino, siguiendo el dedo
                 finalX = Math.max(minX, Math.min(maxX, tileStartX + dx));
-            } else if (gridPos.col === emptyPos.col) {
+            } else {
                 // Movimiento Vertical
-                const minY = Math.min(gridPos.row, emptyPos.row) * tileSize;
-                const maxY = Math.max(gridPos.row, emptyPos.row) * tileSize;
+                const minY = Math.min(coords.row, emptyCoords.row) * (tileSize + gapSize);
+                const maxY = Math.max(coords.row, emptyCoords.row) * (tileSize + gapSize);
+                // Ajustar entre origen y destino, siguiendo el dedo
                 finalY = Math.max(minY, Math.min(maxY, tileStartY + dy));
             }
 
@@ -285,33 +440,34 @@
             currentTile.removeEventListener('pointermove', onPointerMove);
             currentTile.removeEventListener('pointerup', onPointerUp);
             currentTile.classList.remove('dragging');
-            currentTile.classList.add('snap-back'); // Activar animación de ajuste
+            currentTile.classList.add('snap-back'); // Animación de encaje
 
             const tileId = parseInt(currentTile.dataset.id);
             const currentIndex = gameState.indexOf(tileId);
             
+            // LÓGICA DE ENCAJE (SNAP)
+            
             // Calcular dónde soltó (en términos de cuadrícula)
-            const matrix = new DOMMatrix(window.getComputedStyle(currentTile).transform);
-            const releasedCol = Math.round(matrix.m41 / tileSize);
-            const releasedRow = Math.round(matrix.m42 / tileSize);
-            const releasedIndex = releasedRow * gridCount + releasedCol;
+            const matrix = new DOMMatrix(getComputedStyle(currentTile).transform);
+            // Redondear a la celda más cercana (col/row * base_size)
+            const releasedCol = Math.round(matrix.m41 / (tileSize + gapSize));
+            const releasedRow = Math.round(matrix.m42 / (tileSize + gapSize));
+            const targetIndex = releasedRow * gridCols + releasedCol;
 
-            // Verificar si el "ajuste" es al hueco vacío
-            const emptyIndex = emptyPos.row * gridCount + emptyPos.col;
-
-            if (releasedIndex === emptyIndex) {
-                // MOVIMIENTO CONFIRMADO
-                // Actualizar Estado
-                gameState[emptyIndex] = tileId;
-                gameState[currentIndex] = tilesCount - 1; // El hueco ahora está donde estaba la pieza
+            // ¿Soltó en la celda vacía?
+            if (targetIndex === emptyIndex) {
+                // CONFIRMAR MOVIMIENTO
+                // 1. Intercambiar en el mapa de estado
+                [gameState[currentIndex], gameState[emptyIndex]] = [gameState[emptyIndex], gameState[currentIndex]];
                 
-                // Actualizar emptyPos visual
-                emptyPos = getGridPos(currentIndex);
-                
-                // Ajustar visualmente a la nueva celda
+                // 2. Actualizar visualmente a la nueva celda exacta
                 updateTilePositionDOM(currentTile, emptyIndex);
                 
-                setTimeout(checkWin, 250); // Comprobar victoria después de la animación
+                // 3. El nuevo hueco es donde estaba la pieza
+                emptyIndex = currentIndex;
+                
+                // Comprobar victoria
+                setTimeout(checkWin, 250);
             } else {
                 // Volver a la posición original
                 updateTilePositionDOM(currentTile, currentIndex);
@@ -321,52 +477,64 @@
             currentTile = null;
         }
 
-        // --- Mezcla y Victoria ---
+        /* --- MEZCLA Y VERIFICACIÓN --- */
+        
         function shuffle() {
-            puzzleSolved = false;
-            statusDiv.innerText = "";
-            
-            // Mezcla aleatoria pero resoluble
-            for (let i = 0; i < 200; i++) {
+            statusMessage.innerText = '';
+            // Mezcla aleatoria garantizada como resoluble
+            for (let i = 0; i < 300; i++) {
                 const movableIndices = [];
-                // Encontrar piezas adyacentes al hueco
-                const emptyIdx = emptyPos.row * gridCount + emptyPos.col;
+                const emptyCoords = getGridCoords(emptyIndex);
 
-                if (emptyPos.row > 0) movableIndices.push(emptyIdx - gridCount); // Arriba
-                if (emptyPos.row < gridCount - 1) movableIndices.push(emptyIdx + gridCount); // Abajo
-                if (emptyPos.col > 0) movableIndices.push(emptyIdx - 1); // Izquierda
-                if (emptyPos.col < gridCount - 1) movableIndices.push(emptyIdx + 1); // Derecha
+                // Encontrar vecinos del hueco
+                if (emptyCoords.row > 0) movableIndices.push(emptyIndex - gridCols); // Arriba
+                if (emptyCoords.row < gridRows - 1) movableIndices.push(emptyIndex + gridCols); // Abajo
+                if (emptyCoords.col > 0) movableIndices.push(emptyIndex - 1); // Izquierda
+                if (emptyCoords.col < gridCols - 1) movableIndices.push(emptyIndex + 1); // Derecha
 
                 const randIdx = movableIndices[Math.floor(Math.random() * movableIndices.length)];
                 
-                // Intercambiar en el estado
-                [gameState[emptyIdx], gameState[randIdx]] = [gameState[randIdx], gameState[emptyIdx]];
-                // Actualizar posición del hueco
-                emptyPos = getGridPos(randIdx);
+                // Intercambiar en estado
+                [gameState[emptyIndex], gameState[randIdx]] = [gameState[randIdx], gameState[emptyIndex]];
+                emptyIndex = randIdx;
             }
 
-            // Re-renderizar todo en sus nuevas posiciones
-            renderTiles();
+            // Re-renderizar todo en sus nuevas posiciones mezcladas
+            const tiles = gameBoard.querySelectorAll('.tile');
+            tiles.forEach((tile, _) => {
+                const tileId = parseInt(tile.dataset.id);
+                const pos = gameState.indexOf(tileId);
+                updateTilePositionDOM(tile, pos);
+                tile.classList.remove('solved');
+            });
+            
+            shuffleBtn.classList.add('active'); // Activar el juego
+            shuffleBtn.innerText = "Reiniciar Mezcla";
         }
 
         function checkWin() {
             let win = true;
-            for (let i = 0; i < tilesCount; i++) {
+            for (let i = 0; i < totalTiles; i++) {
                 if (gameState[i] !== i) {
                     win = false;
                     break;
                 }
             }
             if (win) {
-                puzzleSolved = true;
-                statusDiv.innerText = "¡Excelente! Imagen completada.";
+                statusMessage.innerText = "¡Excelente! Imagen completada.";
+                shuffleBtn.classList.remove('active');
+                shuffleBtn.innerText = "Jugar de Nuevo";
+                
                 // Mostrar la pieza que faltaba (opcional)
-                document.querySelector('.tile.empty').style.visibility = 'visible';
+                const emptyTile = gameBoard.querySelector('.tile.empty');
+                if (emptyTile) {
+                    emptyTile.style.backgroundImage = `url(${currentImageSrc})`;
+                    emptyTile.classList.remove('empty');
+                    emptyTile.classList.add('solved');
+                    emptyTile.style.visibility = 'visible';
+                }
             }
         }
-
-        // Arrancar
-        window.onload = initGame;
 
     </script>
 </body>
